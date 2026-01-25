@@ -199,16 +199,21 @@ const dumpToNewSchemaJSON = async () => {
   const fs = require('fs');
   const path = require('path');
   const pwd = getPWD();
-  console.log(`Writing export files to: ${pwd}`);
-  const dictionaryPath = path.join(pwd, 'dictionary.txt');
-  const graphicsPath = path.join(pwd, 'graphics.txt');
-  console.log(`Graphics path: ${graphicsPath}`);
+
+  // Export to separate files (don't overwrite main graphics.txt!)
+  const dictionaryPath = path.join(pwd, 'dictionary_export.txt');
+  const graphicsPath = path.join(pwd, 'graphics_export.txt');
+  console.log(`Writing export files to: ${graphicsPath}`);
+
   const dictionary = fs.createWriteStream(dictionaryPath);
   const graphics = fs.createWriteStream(graphicsPath);
   await runMigration(dumpGlyph(dictionary, graphics), (() => {
     dictionary.end();
     graphics.end();
-    console.log('Export files written and closed.');
+    console.log('Export complete. Files written to:');
+    console.log(`  - ${dictionaryPath}`);
+    console.log(`  - ${graphicsPath}`);
+    console.log('Use "task stroke:export" to merge into main graphics.txt');
   }));
 }
 
