@@ -37,7 +37,7 @@ class PathStage extends AbstractStage {
 Template.path_stage.events({
   'blur .value': function(event) {
     const text = $(event.target).text();
-    const value = text.length === 1 && text !== '?' ? text : undefined;
+    const value = [...text].length === 1 && text !== '?' ? text : undefined;
     if (value === stage.alternative) {
       $(event.target).text(value || '?');
     } else {
@@ -48,7 +48,8 @@ Template.path_stage.events({
   'click .option': function(event) {
     const label = this.label;
     const character = stage.character;
-    assert(character.length === 1);
+    // Handle surrogate pairs (CJK Extension B characters have length 2 in JS)
+    assert([...character].length === 1);
     Session.set('modal.text', `Loading ${label}...`);
     Session.set('modal.value', 0);
     window.opentype.load(this.font, (error, font) => {
@@ -74,8 +75,14 @@ Template.path_stage.events({
 
 Template.path_stage.helpers({
   alternative: () => Session.get('stages.path.alternative') || '?',
-  options: () => [{font: 'arphic/gkai00mp.ttf', label: 'AR PL KaitiM GB'},
-                  {font: 'arphic/UKaiCN.ttf', label: 'AR PL UKai'}],
+  options: () => [
+    {font: 'arphic/gkai00mp.ttf', label: 'AR PL KaitiM GB'},
+    {font: 'arphic/UKaiCN.ttf', label: 'AR PL UKai'},
+    {font: 'nom-fonts/NomNaTong-Regular.ttf', label: 'Nom Na Tong'},
+    {font: 'nom-fonts/BabelStoneHan.ttf', label: 'BabelStone Han'},
+    {font: 'nom-fonts/PlangothicP1-Regular.ttf', label: 'Plangothic P1'},
+    {font: 'nom-fonts/PlangothicP2-Regular.ttf', label: 'Plangothic P2'},
+  ],
 });
 
 Meteor.startup(() => {

@@ -53,11 +53,11 @@ const updateCharacterValue = (target, text, path) => {
   if (text === subtree.value || subtree.type !== "character") {
     return;
   }
-  const value = text.length === 1 ? text : "?";
+  const value = [...text].length === 1 ? text : "?";
   if (value === subtree.value) {
     target.text(value);
   } else {
-    subtree.value = text.length === 1 ? text : "?";
+    subtree.value = [...text].length === 1 ? text : "?";
     stage.forceRefresh();
   }
 };
