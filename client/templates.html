@@ -99,16 +99,16 @@
   <div class="character">
     {{> glyph character}}
   </div>
-  <div class="permutation">
-    {{#sortable items=items options=options sortField="index"}}
-      <div class="entry" style="background-color: {{background}};
+  <div class="permutation sortable-list">
+    {{#each items}}
+      <div class="entry" data-index="{{index}}" style="background-color: {{background}};
                                 border-color: {{color}};">
         <a class="reverse">Reverse</a>
         <div class="small">{{> glyph glyph}}</div>
         <div class="clear"></div>
         <div class="character">{{> glyph glyph}}</div>
       </div>
-    {{/sortable}}
+    {{/each}}
   </div>
 </template>
 

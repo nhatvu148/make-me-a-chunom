@@ -70,7 +70,7 @@ class AbstractStage {
   // implementation simply checks that none of the log lines are errors.
   validate() {
     const log = Session.get('stage.status');
-    assert(log && log.filter((x) => x.cls === 'error').length === 0);
+    assert(!log || log.filter((x) => x.cls === 'error').length === 0);
   }
 }
 

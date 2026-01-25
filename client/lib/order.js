@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import {AbstractStage} from '/client/lib/abstract';
 import {assert, Point} from '/lib/base';
 import {decomposition_util} from '/lib/decomposition_util';
@@ -268,6 +269,23 @@ Template.order_stage.events({
   'click .permutation .entry .reverse': function(event) {
     stage && stage.onReverseStroke(this.stroke_index);
   },
+});
+
+Template.order_stage.onRendered(function() {
+  import('sortablejs').then((module) => {
+    const Sortable = module.default;
+    const el = this.find('.sortable-list');
+    if (el && !el._sortable) {
+      el._sortable = Sortable.create(el, {
+        animation: 150,
+        onEnd: function(evt) {
+          if (stage && evt.oldIndex !== evt.newIndex) {
+            stage.onSort(evt.oldIndex, evt.newIndex);
+          }
+        }
+      });
+    }
+  });
 });
 
 Template.order_stage.helpers({

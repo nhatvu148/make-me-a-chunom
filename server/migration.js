@@ -53,16 +53,50 @@ const convertOldPathSchemaToSVGPath = (path) => {
 }
 
 const dumpGlyph = (dictionary, graphics) => (glyph) => {
+  // Log all glyphs being processed (for debugging)
+  if (glyph.codepoint > 0xFFFF) {
+    console.log(`Checking glyph: ${glyph.character} (U+${glyph.codepoint.toString(16).toUpperCase()}), verified: ${JSON.stringify(glyph.stages.verified)}`);
+  }
+
   if (!glyph.stages.verified) {
     return;
   }
   const analysis = glyph.stages.analysis;
   const order = glyph.stages.order;
+
+  // Debug logging for Extension B characters (codepoint > 0xFFFF)
+  if (glyph.codepoint > 0xFFFF) {
+    console.log(`Processing Extension B character: ${glyph.character} (U+${glyph.codepoint.toString(16).toUpperCase()})`);
+  }
+
+  if (!order || !Array.isArray(order)) {
+    console.error(`Missing or invalid order for ${glyph.character}`);
+    return;
+  }
+
+  if (!glyph.stages.strokes || !glyph.stages.strokes.corrected) {
+    console.error(`Missing strokes.corrected for ${glyph.character}`);
+    return;
+  }
+
   const data = cjklib.getCharacterData(glyph.character);
   const pinyin = (glyph.metadata.pinyin || data.pinyin || '')
                      .split(',').map((x) => x.trim()).filter((x) => x);
   const strokes = order.map((x) => glyph.stages.strokes.corrected[x.stroke]);
   const medians = order.map((x) => x.median);
+
+  // Check for missing strokes or medians
+  const missingStrokes = strokes.filter((x, i) => !x);
+  const missingMedians = medians.filter((x, i) => !x);
+  if (missingStrokes.length > 0) {
+    console.error(`Missing ${missingStrokes.length} strokes for ${glyph.character}`);
+    return;
+  }
+  if (missingMedians.length > 0) {
+    console.error(`Missing ${missingMedians.length} medians for ${glyph.character}`);
+    return;
+  }
+
   strokes.map((x) => assert(x));
   medians.map((x) => assert(x));
   const has_etymology =
@@ -82,6 +116,11 @@ const dumpGlyph = (dictionary, graphics) => (glyph) => {
     strokes: strokes,
     medians: medians,
   }) + '\n');
+
+  // Log successful export for Extension B characters
+  if (glyph.codepoint > 0xFFFF) {
+    console.log(`Successfully exported: ${glyph.character}`);
+  }
 }
 
 const fixBrokenMedians = (glyph, threshold) => {
@@ -156,15 +195,20 @@ const migrateOldGlyphSchemaToNew = (glyph) => {
 
 // Meteor methods that make use of the migration system follow.
 
-const dumpToNewSchemaJSON = () => {
+const dumpToNewSchemaJSON = async () => {
   const fs = require('fs');
   const path = require('path');
   const pwd = getPWD();
-  const dictionary = fs.createWriteStream(path.join(pwd, 'dictionary.txt'));
-  const graphics = fs.createWriteStream(path.join(pwd, 'graphics.txt'));
-  runMigration(dumpGlyph(dictionary, graphics), (() => {
+  console.log(`Writing export files to: ${pwd}`);
+  const dictionaryPath = path.join(pwd, 'dictionary.txt');
+  const graphicsPath = path.join(pwd, 'graphics.txt');
+  console.log(`Graphics path: ${graphicsPath}`);
+  const dictionary = fs.createWriteStream(dictionaryPath);
+  const graphics = fs.createWriteStream(graphicsPath);
+  await runMigration(dumpGlyph(dictionary, graphics), (() => {
     dictionary.end();
     graphics.end();
+    console.log('Export files written and closed.');
   }));
 }
 
@@ -210,13 +254,18 @@ const loadFromOldSchemaJSON = (filename) => {
 
 // Runs the given per-glyph callback for each glyph in the database.
 // When all the glyphs are migrated, runs the completion callback.
-const runMigration = (per_glyph_callback, completion_callback) => {
+const runMigration = async (per_glyph_callback, completion_callback) => {
   console.log('Running migration...');
   if (per_glyph_callback) {
-    const codepoints =
-        Glyphs.find({}, {fields: {codepoint: 1}, sort: {codepoint: 1}}).fetch();
+    const codepoints = await Glyphs.find({}, {fields: {codepoint: 1}, sort: {codepoint: 1}}).fetchAsync();
+    console.log(`Found ${codepoints.length} total glyphs in database`);
+
+    // Count verified glyphs
+    const verifiedCount = await Glyphs.find({'stages.verified': {$ne: null}}).countAsync();
+    console.log(`Found ${verifiedCount} verified glyphs`);
+
     for (let i = 0; i < codepoints.length; i++) {
-      const glyph = Glyphs.findOne({codepoint: codepoints[i].codepoint});
+      const glyph = await Glyphs.findOneAsync({codepoint: codepoints[i].codepoint});
       assert(glyph, 'Glyphs changed during migration!');
       per_glyph_callback(glyph);
       if ((i + 1) % 1000 === 0) {

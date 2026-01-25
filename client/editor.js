@@ -86,7 +86,7 @@ const incrementStage = (amount) => {
       // the incomplete-component message.
       const log = Session.get("stage.status");
       const prefix = "Incomplete components: ";
-      if (log.length > 0 && log[0].message.startsWith(prefix)) {
+      if (log && log.length > 0 && log[0].message && log[0].message.startsWith(prefix)) {
         changeGlyph("getGlyph", log[0].message[prefix.length]);
       }
       return;
