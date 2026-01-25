@@ -1,52 +1,116 @@
-# make-me-a-hanzi-tool
-A (probably) working version of the make-me-a-hanzi tool.
+# make-me-a-chunom
 
-Building:
+A stroke order editor for Vietnamese Chữ Nôm (𡨸喃) characters.
 
-1. Install mongodb
-1. Install node and run `npm i`
-1. Install meteor using the following command:
-    ```sh
-    curl https://install.meteor.com/ | sh
-    ```
-1. Run `meteor run`
+Based on [make-me-a-hanzi](https://github.com/skishore/makemeahanzi) and [make-me-a-hanzi-tool](https://github.com/MadLadSquad/make-me-a-hanzi-tool), upgraded to **Meteor 3.x** for modern compatibility.
 
-Editor usage:
+## Features
 
-1. Append a "#", followed by the character you want to edit in the URL like this: `localhost:3000/#A`. Open the URL in the browser
-2. Write any data for your character if it doesn't exist
-3. Select one of the 2 fonts from the list to edit your character
-4. Go trough the tool
-5. Keybindings:
-    1. S - Go to the next page of the editor
-    2. W - Go to the previous page
-    3. R - Clear changes in the stroke editor
-    4. N - Next character
-6. Note: When cutting 2 intersecting strokes, create 1 or 2 rectangles in the overlapped area when cutting. If any unneeded strokes appear deselect them
+- Create stroke order data for Chữ Nôm characters (including CJK Extension B/C/D)
+- Export to hanzi-writer compatible format
+- Docker-based setup for easy deployment
 
-## Additional script usage for Youyin
-In addition to improving the editor, we've also added scripts to make generating data for [youyin](https://github.com/MadLadSquad/YouyinWeb) and 
-[hanzi-writer](https://github.com/chanind/hanzi-writer) easier. All scripts are located under the `server/` directory because that's where the character data is generated.
+## Quick Start (Docker)
 
-- `process.py` - Reads the `make-me-a-hanzi` dictionary from the characters you have created and converts it to individual character files in `hanzi-writer` format under the `output` folder. Do not use directly, use `run.sh` instead
-- `run.sh` - Gets the character data from the meteor database, exports it to `tmp.json`, which is used as a `make-me-a-hanzi` dictionary file. It then runs `process.py`
+```bash
+# Start the editor
+docker compose up --build
 
-### `youyin-dev-run.sh`
-This script runs `./run.sh` for Youyin development. First, make sure you have the following repositories cloned in the same folder without renames:
+# Open in browser
+http://localhost:3000/#家
+```
 
-- make-me-a-hanzi-tool
-- [YouyinWeb](https://github.com/MadLadSquad/YouyinWeb)
-- [hanzi-writer-data-youyin](https://github.com/MadLadSquad/hanzi-writer-data-youyin)
+## Manual Setup
 
-Create a symbolic link so that `hanzi-writer-data-youyin/data/` points to `YouyinWeb/data/`: `ln -s YouyinWeb/data/ hanzi-writer-data-youyin/data/`
+1. Install [Meteor](https://www.meteor.com/install):
+   ```bash
+   curl https://install.meteor.com/ | sh
+   ```
 
-Next, edit `YouyinWeb/index.js` and change the `window.CHARACTER_FETCH_URL` string to `"http://0.0.0.0:8080/data/"`
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-With this setup, you can test characters. Now, every time you have finished a batch of characters, go into the `make-me-a-hanzi-tool/server` directory and run `./youyin-dev-run.sh`. It will:
+3. Run the editor:
+   ```bash
+   meteor run
+   ```
 
-- Create `hanzi-writer` character files, like `run.sh`
-- Copy them to `hanzi-writer-data-youyin/data`
-- Go into `YouyinWeb` and run `./run.sh` to start the server.
-- Finally, open Youyin locally on `http://0.0.0.0:8080` and try creating character cards with the new characters.
+4. Open `http://localhost:3000/#家` in your browser
 
-Once all characters are working and generated correctly, simply go to the `hanzi-writer-data-youyin` directory, commit and push the changes.
+## Editor Workflow
+
+1. **Path** - Load character outline from font (AR PL UKai or AR PL KaitiM GB)
+2. **Bridges** - Define stroke boundaries by connecting points
+3. **Strokes** - Verify and select correct strokes
+4. **Analysis** - Set decomposition, radical, and etymology
+5. **Order** - Draw median lines for each stroke (animation path)
+6. **Verified** - Mark as complete and save
+
+## Keybindings
+
+| Key | Action |
+|-----|--------|
+| `S` | Next stage |
+| `W` | Previous stage |
+| `D` | Next character |
+| `A` | Previous character |
+| `R` | Reset current stage |
+| `E` | Next verified character |
+| `Q` | Previous verified character |
+
+## Export Data
+
+In the browser console:
+
+```javascript
+Meteor.call('export')
+```
+
+This creates:
+- `graphics.txt` - Stroke paths and medians (for hanzi-writer)
+- `dictionary.txt` - Definitions, decomposition, etymology
+
+### Export Individual JSON Files
+
+```bash
+cd server
+./run.sh
+```
+
+Creates individual character files in `server/output/` folder.
+
+## Test Stroke Animations
+
+To preview animations from your local `graphics.txt`:
+
+```bash
+python3 -m http.server 8992
+```
+
+Then open: http://localhost:8992/test-local.html
+
+Type any character and click **Animate** to verify the stroke data.
+
+## Data Format
+
+The exported data is compatible with [hanzi-writer](https://github.com/chanind/hanzi-writer):
+
+```json
+{
+  "character": "家",
+  "strokes": ["M 464 824 Q...", ...],
+  "medians": [[[451, 856], [534, 814], ...], ...]
+}
+```
+
+## Credits
+
+- Original data and editor: [skishore/makemeahanzi](https://github.com/skishore/makemeahanzi)
+- Editor improvements: [MadLadSquad/make-me-a-hanzi-tool](https://github.com/MadLadSquad/make-me-a-hanzi-tool)
+- Fonts: [Arphic Public License](http://ftp.gnu.org/gnu/non-gnu/chinese-fonts-truetype/)
+
+## License
+
+[Arphic Public License](https://www.freedesktop.org/wiki/Arphic_Public_License/)
