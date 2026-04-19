@@ -1,0 +1,10 @@
+.meteor/local
+node_modules
+npm-debug.log*
+yarn-error.log*
+.git
+.gitignore
+.DS_Store
+*.log
+server/backup
+server/tmp.json

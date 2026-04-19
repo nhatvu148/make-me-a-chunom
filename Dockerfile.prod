@@ -1,0 +1,65 @@
+# Production Dockerfile for stroke-editor (Meteor 3.x)
+# Multi-stage: builds the Meteor app to a Node bundle, then runs it
+# on a lean node:20-slim runtime without the Meteor toolchain.
+
+# ---------- Builder ----------
+FROM node:20-slim AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV METEOR_ALLOW_SUPERUSER=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        python3 \
+        build-essential \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin Meteor to match .meteor/release (METEOR@3.1) so rebuilds stay reproducible.
+RUN curl -fsSL "https://install.meteor.com/?release=3.1" | sh
+
+WORKDIR /src
+
+COPY package.json package-lock.json* ./
+COPY .meteor .meteor/
+
+RUN meteor npm install
+
+COPY . .
+
+# --directory: emit an unpacked bundle at /build/bundle (no tarball).
+# Architecture auto-detects from the build platform — use buildx --platform
+# if cross-building.
+RUN meteor build /build --directory
+
+# ---------- Runtime ----------
+FROM node:20-slim AS runtime
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    # lib/base.js:getPWD() uses process.env.PWD, then falls back to
+    # process.cwd() + "../../../.." (a dev-only path). Pin PWD to /app so
+    # server-side reads/writes resolve to /app/public and /app/server/output,
+    # matching the bind mounts in docker-compose.prod.yml.
+    PWD=/app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /build/bundle /app
+
+# Seed /app/public and /app/server/output with the source-tree data files so
+# a fresh deploy with empty bind mounts (or no mounts) still has graphics.txt,
+# dictionary.txt, etc. Bind mounts will override these at runtime.
+COPY --from=builder /src/public /app/public
+COPY --from=builder /src/server/output /app/server/output
+
+RUN cd programs/server && npm install --omit=dev
+
+EXPOSE 3000
+
+CMD ["node", "main.js"]
