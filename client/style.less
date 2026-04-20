@@ -1,3 +1,73 @@
+// Nôm font stack. These TTFs ship with the app (public/nom-fonts/) and
+// between them cover Han + CJK Ext A–I + SPUA Nôm assignments used by
+// the digital Nôm community. Mirrors apps/web/src/app/globals.css.
+@font-face {
+    font-family: "NomNaTong";
+    src: url("/nom-fonts/NomNaTong-Regular.ttf") format("truetype");
+    font-display: swap;
+}
+// BabelStone must be unicode-range restricted to its actual coverage.
+// Without it, chars outside its coverage still match the family and return
+// .notdef (tofu rectangles) instead of falling through to the next font.
+@font-face {
+    font-family: "BabelStoneHan";
+    src: url("/nom-fonts/BabelStoneHan.ttf") format("truetype");
+    unicode-range: U+4E00-9FFF, U+3400-4DBF, U+20000-2A6DF, U+2A700-2B739, U+2B740-2B81D, U+2B820-2CEA1, U+2CEB0-2EBE0, U+2EBF0-2EE5F, U+2F800-2FA1F, U+30000-3134A, U+31350-323AF;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Plangothic";
+    src: url("/nom-fonts/PlangothicP1-Regular.ttf") format("truetype");
+    unicode-range: U+0000-1FFFF;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Plangothic";
+    src: url("/nom-fonts/PlangothicP2-Regular.ttf") format("truetype");
+    unicode-range: U+20000-3FFFF;
+    font-display: swap;
+}
+// Subset woff2 overlays for ranges the base TTFs miss — PUA Nôm, Ext B–G
+// overlay, and Ext H–I. Attached to the NomNaTong / Plangothic families
+// so they get picked up first with no stack change.
+@font-face {
+    font-family: "NomNaTong";
+    src: url("/nom-fonts/NomNaTong-PUA.woff2") format("woff2");
+    unicode-range: U+E000-F8FF, U+F0000-FFFFD;
+    font-display: swap;
+}
+@font-face {
+    font-family: "NomNaTong";
+    src: url("/nom-fonts/NomNaTong-ExtBG.woff2") format("woff2");
+    unicode-range: U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF, U+2CEB0-2EBEF, U+30000-3134F;
+    font-display: swap;
+}
+@font-face {
+    font-family: "Plangothic";
+    src: url("/nom-fonts/PlangothicP2-ExtHI.woff2") format("woff2");
+    unicode-range: U+31350-323AF;
+    font-display: swap;
+}
+
+// Apply the Nôm font stack globally so SPUA characters (e.g. 󰞺) render
+// instead of showing as tofu. Uses !important because Bootstrap's body /
+// panel / control rules otherwise override it.
+html,
+body,
+input,
+textarea,
+select,
+button,
+.panel,
+.panel-title,
+.navbar,
+#editor,
+#editor * {
+    font-family: "NomNaTong", "BabelStoneHan", "Plangothic",
+                 "Noto Sans CJK SC", "Source Han Sans",
+                 -apple-system, "Segoe UI", sans-serif !important;
+}
+
 // Bootstrap style overrides.
 .panel-title {
     font-size: 16px;
