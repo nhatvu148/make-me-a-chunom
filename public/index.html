@@ -384,13 +384,23 @@
       return data;
     }
 
-    // Load the tiny index (just the char list, ~58 KB), not the 31 MB graphics.txt.
-    // index.json stores characters newest-first (reverse of graphics.txt order),
-    // so no client-side reversing needed. Per-char stroke data is fetched on demand in load().
+    // Load the tiny index (~60 KB), not the 31 MB graphics.txt.
+    // Two on-disk formats we must handle:
+    //   a) {count, characters: [...]}            — explorer-native, pre-reversed
+    //   b) {"𥪝":"25A9D.json", ...}               — Meteor editor export (graphics.txt order)
+    // Normalize to "newest first" for display.
     fetch('stroke-data/index.json')
       .then(r => r.json())
       .then(data => {
-        charList = data.characters.slice();
+        if (Array.isArray(data.characters)) {
+          // Already newest-first in this format (by convention of our regen)
+          charList = data.characters.slice();
+        } else if (data && typeof data === 'object') {
+          // Flat char -> filename map; keys are in graphics.txt order (oldest first)
+          charList = Object.keys(data).reverse();
+        } else {
+          throw new Error('unexpected index.json shape');
+        }
         charSet = new Set(charList);
         document.getElementById('status').className = 'status success';
         document.getElementById('status').textContent = `Loaded ${charList.length} characters`;
