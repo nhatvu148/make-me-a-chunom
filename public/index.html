@@ -363,33 +363,44 @@
 
   <script>
     let writer = null;
-    let charData = {};
-    let charList = [];
+    let charData = {};      // cache: character → stroke data (populated on demand)
+    let charList = [];      // ordered list for the grid
+    let charSet = new Set(); // membership for search / load()
     let currentPage = 0;
     const pageSize = 100;
 
-    // Load graphics.txt
-    fetch('graphics.txt')
-      .then(r => r.text())
-      .then(text => {
-        text.split('\n').filter(l => l).forEach(line => {
-          try {
-            const d = JSON.parse(line);
-            charData[d.character] = d;
-            charList.push(d.character);
-          } catch (e) {}
-        });
-        // Reverse so newest characters (bottom of file) appear first
-        charList.reverse();
+    // Per-char stroke data lives in stroke-data/{HEX_CODEPOINT}.json.
+    // Used by load() and prefetched on hover from the grid.
+    function strokeDataUrl(char) {
+      return `stroke-data/${char.codePointAt(0).toString(16).toUpperCase()}.json`;
+    }
+
+    async function fetchCharData(char) {
+      if (charData[char]) return charData[char];
+      const res = await fetch(strokeDataUrl(char));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      charData[char] = data;
+      return data;
+    }
+
+    // Load the tiny index (just the char list, ~58 KB), not the 31 MB graphics.txt.
+    // index.json stores characters newest-first (reverse of graphics.txt order),
+    // so no client-side reversing needed. Per-char stroke data is fetched on demand in load().
+    fetch('stroke-data/index.json')
+      .then(r => r.json())
+      .then(data => {
+        charList = data.characters.slice();
+        charSet = new Set(charList);
         document.getElementById('status').className = 'status success';
-        document.getElementById('status').textContent = `Loaded ${charList.length} characters from graphics.txt`;
+        document.getElementById('status').textContent = `Loaded ${charList.length} characters`;
         document.getElementById('total-count').textContent = charList.length;
         renderCharGrid();
         load();
       })
       .catch(err => {
         document.getElementById('status').className = 'status error';
-        document.getElementById('status').textContent = 'Failed to load graphics.txt: ' + err.message;
+        document.getElementById('status').textContent = 'Failed to load index: ' + err.message;
       });
 
     function renderCharGrid() {
@@ -426,16 +437,26 @@
       load();
     }
 
-    function load() {
+    async function load() {
       const char = document.getElementById('char').value.trim();
       if (!char) return;
 
-      const data = charData[char];
+      const codepoint = char.codePointAt(0);
+      const unicodeHex = codepoint.toString(16).toUpperCase().padStart(4, '0');
+
+      let data = charData[char];
+      if (!data && charSet.has(char)) {
+        document.getElementById('status').className = 'status info';
+        document.getElementById('status').textContent = `Loading ${char}…`;
+        try {
+          data = await fetchCharData(char);
+        } catch (_) { /* fall through to not-found */ }
+      }
+
       if (!data) {
         document.getElementById('status').className = 'status error';
-        document.getElementById('status').textContent = `Character not found: ${char} (U+${char.codePointAt(0).toString(16).toUpperCase()})`;
+        document.getElementById('status').textContent = `Character not found: ${char} (U+${unicodeHex})`;
         document.getElementById('info-char').textContent = char;
-        const unicodeHex = char.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
         document.getElementById('info-unicode').textContent = 'U+' + unicodeHex;
         document.getElementById('info-unicode').href = 'https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=' + unicodeHex;
         document.getElementById('info-strokes').textContent = '-';
@@ -489,14 +510,12 @@
       }
 
       // Update info
-      const codepoint = char.codePointAt(0);
       const isExtensionB = codepoint > 0xFFFF;
 
       document.getElementById('char-display').textContent = char;
       document.getElementById('info-char').textContent = char;
-      const unicodeHexSuccess = codepoint.toString(16).toUpperCase().padStart(4, '0');
-      document.getElementById('info-unicode').textContent = 'U+' + unicodeHexSuccess;
-      document.getElementById('info-unicode').href = 'https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=' + unicodeHexSuccess;
+      document.getElementById('info-unicode').textContent = 'U+' + unicodeHex;
+      document.getElementById('info-unicode').href = 'https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=' + unicodeHex;
       document.getElementById('info-strokes').textContent = data.strokes.length;
       document.getElementById('info-source').textContent = isExtensionB ? 'Custom Nôm' : 'Make Me a Hanzi';
 
@@ -540,7 +559,7 @@
       }
 
       // If it's a full character, just load it
-      if (charData[query]) {
+      if (charSet.has(query)) {
         searchResults.classList.remove('show');
         return;
       }
@@ -551,7 +570,7 @@
         const codepoint = parseInt(hex, 16);
         if (!isNaN(codepoint)) {
           const char = String.fromCodePoint(codepoint);
-          if (charData[char]) {
+          if (charSet.has(char)) {
             charInput.value = char;
             load();
           }
