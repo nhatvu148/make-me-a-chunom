@@ -7,9 +7,55 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%236366f1'/%3E%3Cstop offset='100%25' style='stop-color:%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='6' fill='url(%23bg)'/%3E%3Ctext x='16' y='24' font-family='serif' font-size='20' fill='%23fff' text-anchor='middle' font-weight='700'%3E喃%3C/text%3E%3C/svg%3E">
   <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
   <style>
+    /* Nôm font stack. These TTFs/WOFF2s ship in /nom-fonts/ and between
+       them cover Han + CJK Ext A–I + SPUA Nôm assignments. BabelStone
+       is unicode-range restricted so .notdef glyphs don't block
+       fallthrough to Plangothic. Mirrors apps/web/src/app/globals.css. */
+    @font-face {
+      font-family: 'NomNaTong';
+      src: url('nom-fonts/NomNaTong-Regular.ttf') format('truetype');
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'BabelStoneHan';
+      src: url('nom-fonts/BabelStoneHan.ttf') format('truetype');
+      unicode-range: U+4E00-9FFF, U+3400-4DBF, U+20000-2A6DF, U+2A700-2B739, U+2B740-2B81D, U+2B820-2CEA1, U+2CEB0-2EBE0, U+2EBF0-2EE5F, U+2F800-2FA1F, U+30000-3134A, U+31350-323AF;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Plangothic';
+      src: url('nom-fonts/PlangothicP1-Regular.ttf') format('truetype');
+      unicode-range: U+0000-1FFFF;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Plangothic';
+      src: url('nom-fonts/PlangothicP2-Regular.ttf') format('truetype');
+      unicode-range: U+20000-3FFFF;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'NomNaTong';
+      src: url('nom-fonts/NomNaTong-PUA.woff2') format('woff2');
+      unicode-range: U+E000-F8FF, U+F0000-FFFFD;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'NomNaTong';
+      src: url('nom-fonts/NomNaTong-ExtBG.woff2') format('woff2');
+      unicode-range: U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF, U+2CEB0-2EBEF, U+30000-3134F;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Plangothic';
+      src: url('nom-fonts/PlangothicP2-ExtHI.woff2') format('woff2');
+      unicode-range: U+31350-323AF;
+      font-display: swap;
+    }
+
     * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'NomNaTong', 'BabelStoneHan', 'Plangothic', 'Noto Sans CJK', 'Source Han Sans', sans-serif;
       margin: 0;
       padding: 20px;
       background: #f5f5f5;
@@ -48,7 +94,7 @@
       text-align: center;
       border: 2px solid #ddd;
       border-radius: 8px;
-      font-family: 'Noto Sans CJK', 'Source Han Sans', sans-serif;
+      font-family: 'NomNaTong', 'BabelStoneHan', 'Plangothic', 'Noto Sans CJK', 'Source Han Sans', sans-serif;
     }
     .char-input:focus {
       outline: none;
@@ -112,6 +158,7 @@
       font-size: 24px;
       color: #333;
       margin-top: 15px;
+      font-family: 'NomNaTong', 'BabelStoneHan', 'Plangothic', 'Noto Sans CJK', 'Source Han Sans', sans-serif;
     }
     .info-panel {
       background: white;
@@ -180,6 +227,7 @@
       cursor: pointer;
       border-bottom: 1px solid #eee;
       font-size: 18px;
+      font-family: 'NomNaTong', 'BabelStoneHan', 'Plangothic', 'Noto Sans CJK', 'Source Han Sans', sans-serif;
     }
     .search-item:hover {
       background: #f5f5f5;
@@ -215,7 +263,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Noto Sans CJK', 'Source Han Sans', sans-serif;
+      font-family: 'NomNaTong', 'BabelStoneHan', 'Plangothic', 'Noto Sans CJK', 'Source Han Sans', sans-serif;
     }
     .pagination {
       display: flex;
@@ -315,33 +363,44 @@
 
   <script>
     let writer = null;
-    let charData = {};
-    let charList = [];
+    let charData = {};      // cache: character → stroke data (populated on demand)
+    let charList = [];      // ordered list for the grid
+    let charSet = new Set(); // membership for search / load()
     let currentPage = 0;
     const pageSize = 100;
 
-    // Load graphics.txt
-    fetch('graphics.txt')
-      .then(r => r.text())
-      .then(text => {
-        text.split('\n').filter(l => l).forEach(line => {
-          try {
-            const d = JSON.parse(line);
-            charData[d.character] = d;
-            charList.push(d.character);
-          } catch (e) {}
-        });
-        // Reverse so newest characters (bottom of file) appear first
-        charList.reverse();
+    // Per-char stroke data lives in stroke-data/{HEX_CODEPOINT}.json.
+    // Used by load() and prefetched on hover from the grid.
+    function strokeDataUrl(char) {
+      return `stroke-data/${char.codePointAt(0).toString(16).toUpperCase()}.json`;
+    }
+
+    async function fetchCharData(char) {
+      if (charData[char]) return charData[char];
+      const res = await fetch(strokeDataUrl(char));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      charData[char] = data;
+      return data;
+    }
+
+    // Load the tiny index (just the char list, ~58 KB), not the 31 MB graphics.txt.
+    // index.json stores characters newest-first (reverse of graphics.txt order),
+    // so no client-side reversing needed. Per-char stroke data is fetched on demand in load().
+    fetch('stroke-data/index.json')
+      .then(r => r.json())
+      .then(data => {
+        charList = data.characters.slice();
+        charSet = new Set(charList);
         document.getElementById('status').className = 'status success';
-        document.getElementById('status').textContent = `Loaded ${charList.length} characters from graphics.txt`;
+        document.getElementById('status').textContent = `Loaded ${charList.length} characters`;
         document.getElementById('total-count').textContent = charList.length;
         renderCharGrid();
         load();
       })
       .catch(err => {
         document.getElementById('status').className = 'status error';
-        document.getElementById('status').textContent = 'Failed to load graphics.txt: ' + err.message;
+        document.getElementById('status').textContent = 'Failed to load index: ' + err.message;
       });
 
     function renderCharGrid() {
@@ -378,16 +437,26 @@
       load();
     }
 
-    function load() {
+    async function load() {
       const char = document.getElementById('char').value.trim();
       if (!char) return;
 
-      const data = charData[char];
+      const codepoint = char.codePointAt(0);
+      const unicodeHex = codepoint.toString(16).toUpperCase().padStart(4, '0');
+
+      let data = charData[char];
+      if (!data && charSet.has(char)) {
+        document.getElementById('status').className = 'status info';
+        document.getElementById('status').textContent = `Loading ${char}…`;
+        try {
+          data = await fetchCharData(char);
+        } catch (_) { /* fall through to not-found */ }
+      }
+
       if (!data) {
         document.getElementById('status').className = 'status error';
-        document.getElementById('status').textContent = `Character not found: ${char} (U+${char.codePointAt(0).toString(16).toUpperCase()})`;
+        document.getElementById('status').textContent = `Character not found: ${char} (U+${unicodeHex})`;
         document.getElementById('info-char').textContent = char;
-        const unicodeHex = char.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
         document.getElementById('info-unicode').textContent = 'U+' + unicodeHex;
         document.getElementById('info-unicode').href = 'https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=' + unicodeHex;
         document.getElementById('info-strokes').textContent = '-';
@@ -441,14 +510,12 @@
       }
 
       // Update info
-      const codepoint = char.codePointAt(0);
       const isExtensionB = codepoint > 0xFFFF;
 
       document.getElementById('char-display').textContent = char;
       document.getElementById('info-char').textContent = char;
-      const unicodeHexSuccess = codepoint.toString(16).toUpperCase().padStart(4, '0');
-      document.getElementById('info-unicode').textContent = 'U+' + unicodeHexSuccess;
-      document.getElementById('info-unicode').href = 'https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=' + unicodeHexSuccess;
+      document.getElementById('info-unicode').textContent = 'U+' + unicodeHex;
+      document.getElementById('info-unicode').href = 'https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=' + unicodeHex;
       document.getElementById('info-strokes').textContent = data.strokes.length;
       document.getElementById('info-source').textContent = isExtensionB ? 'Custom Nôm' : 'Make Me a Hanzi';
 
@@ -492,7 +559,7 @@
       }
 
       // If it's a full character, just load it
-      if (charData[query]) {
+      if (charSet.has(query)) {
         searchResults.classList.remove('show');
         return;
       }
@@ -503,7 +570,7 @@
         const codepoint = parseInt(hex, 16);
         if (!isNaN(codepoint)) {
           const char = String.fromCodePoint(codepoint);
-          if (charData[char]) {
+          if (charSet.has(char)) {
             charInput.value = char;
             load();
           }
